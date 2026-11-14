@@ -28,17 +28,6 @@ STATION_RAMPS = {
     "Moon": ".'`^\",:;Il!i~+_?][}{1)(|/",
 }
 
-TOPICS = [
-    ("🏃", "topic_Fitness"),
-    ("💧", "topic_Hydration"),
-    ("😴", "topic_Sleep"),
-    ("🥗", "topic_Nutrition"),
-    ("🧘", "topic_Mindfulness"),
-    ("💊", "topic_Medication"),
-    ("📈", "topic_Progress"),
-]
-
-
 # ------------------------------------------------------------- ASCII donut
 def donut_frame(A, B, ramp, W=48, H=22):
     """Render one frame of the spinning ASCII torus (the classic donut.c math)."""
@@ -193,11 +182,9 @@ class HomepageMock(tk.Tk):
         c = self.heat
         c.delete("all")
         today = datetime.date.today()
-        
-        # Align start date to the beginning of a 53-week block matching GitHub's layout
-        start = today - datetime.timedelta(days=(WEEKS * 7) + today.weekday() - 6)
+        # first column starts on a Sunday, 52 weeks back
+        start = today - datetime.timedelta(days=52 * 7 + (today.weekday() + 1) % 7)
 
-        # Draw cells column by column (weeks), row by row (days of week)
         for w in range(WEEKS):
             for d in range(7):
                 day = start + datetime.timedelta(days=w * 7 + d)
@@ -205,26 +192,16 @@ class HomepageMock(tk.Tk):
                     continue
                 n = min(self.tasks.get(day, 0), len(HEAT) - 1)
                 x, y = LEFT_PAD + w * PITCH, TOP_PAD + d * PITCH
-                c.create_rectangle(x, y, x + CELL, y + CELL, fill=HEAT[n], outline="", width=0)
+                c.create_rectangle(x, y, x + CELL, y + CELL, fill=HEAT[n], outline="")
+                if day.day == 1 or (w == 0 and d == 0):  # month label on the 1st, and on the first column
+                    c.create_text(x, 8, text=MONTHS[self.lang][day.month - 1], anchor="w",
+                                  fill=MUTED, font=("Helvetica", 8))
 
-        # Draw month labels dynamically across the top header row
-        prev_month = -1
-        for w in range(WEEKS):
-            day = start + datetime.timedelta(days=w * 7)
-            if day.month != prev_month and w < WEEKS - 4:
-                x = LEFT_PAD + w * PITCH
-                c.create_text(x, 6, text=MONTHS[self.lang][day.month - 1], anchor="w",
-                              fill=MUTED, font=("Helvetica", 8))
-                prev_month = day.month
+        for d in (1, 3, 5):
+            c.create_text(0, TOP_PAD + d * PITCH + CELL / 2, text=DAY_LABELS[self.lang][d],
+                          anchor="w", fill=MUTED, font=("Helvetica", 8))
 
-        # Draw day labels on the left margin (e.g., Mon, Wed, Fri)
-        day_labels_map = {1: "Mon", 3: "Wed", 5: "Fri"}
-        for d, label_text in day_labels_map.items():
-            c.create_text(2, TOP_PAD + d * PITCH + CELL / 2, 
-                          text=DAY_LABELS[self.lang][d] if self.lang in DAY_LABELS else label_text,
-                          anchor="w", fill=MUTED, font=("Helvetica", 7))
-
-        c.config(width=LEFT_PAD + WEEKS * PITCH + 10, height=TOP_PAD + 7 * PITCH + 8)
+        c.config(width=LEFT_PAD + WEEKS * PITCH, height=TOP_PAD + 7 * PITCH)
 
     # ----- left sidebar: pops up over the page, emoji per topic, closes with ✕
     def _build_left_sidebar(self):
@@ -236,17 +213,7 @@ class HomepageMock(tk.Tk):
         tk.Button(close_row, text="✕", bg=SIDE_BG, fg=TEXT, bd=0, activebackground=BORDER,
                   activeforeground=TEXT, command=self.toggle_left).pack(side="right", padx=8)
 
-        tk.Label(self.left, text="|||", font=("Helvetica", 14), fg=TEXT,
-                 bg=SIDE_BG).pack(pady=(10, 10))
-        tk.Button(self.left, text="+", font=("Helvetica", 16), width=3, bg=CARD, fg=TEXT,
-                  bd=0, activebackground=BORDER, activeforeground=TEXT).pack(pady=6)
 
-        for emoji, key in TOPICS:
-            tk.Button(self.left, text=emoji, font=("Segoe UI Emoji", 18), width=3, bg=CARD,
-                      fg=TEXT, bd=0, activebackground=BORDER,
-                      activeforeground=TEXT).pack(pady=(8, 0))
-            tk.Label(self.left, text=self.t(key), font=("Helvetica", 8),
-                     fg=MUTED, bg=SIDE_BG).pack(pady=(0, 4))
 
     def toggle_left(self):
         if self.left_open:
