@@ -7,6 +7,7 @@ Flow:
                       -> choose station (ISS / Moon / Mars) and language (EN / AR)
 """
 
+import ctypes
 import time
 import tkinter as tk
 
@@ -18,8 +19,14 @@ from PIL import Image, ImageTk
 import user_store as store
 from i18n import STATIONS, tr
 
-BG, CARD, BORDER = "#0d1117", "#161b22", "#30363d"
-TEXT, MUTED, ACCENT, ERR = "#e6edf3", "#8b949e", "#39d353", "#f85149"
+try:
+    ctypes.windll.shcore.SetProcessDpiAwareness(1)
+except Exception:
+    pass
+
+BG, CARD, BORDER = "#090d16", "#111726", "#232e42"
+CARD_HOVER = "#1a2234"
+TEXT, MUTED, ACCENT, ERR = "#f0f6fc", "#8b949e", "#39d353", "#f85149"
 
 FACE_TOLERANCE = 0.5   # lower = stricter face matching
 SAMPLES_NEEDED = 5     # face snapshots taken during sign-up
@@ -79,8 +86,8 @@ class LoginApp(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Space Health")
-        self.geometry("600x780")
-        self.minsize(520, 660)
+        self.geometry("620x800")
+        self.minsize(540, 680)
         self.configure(bg=BG)
 
         self.lang = "en"
@@ -101,20 +108,36 @@ class LoginApp(tk.Tk):
     def justify(self):
         return "right" if self.lang == "ar" else "left"
 
-    def label(self, parent, text, size=12, bold=False, color=TEXT):
-        return tk.Label(parent, text=text, bg=BG, fg=color, justify=self.justify(),
-                        wraplength=460, font=("Segoe UI", size, "bold" if bold else "normal"))
+    def label(self, parent, text, size=11, bold=False, color=TEXT, bg=None):
+        return tk.Label(
+            parent, text=text, bg=bg or parent.cget("bg"), fg=color,
+            justify=self.justify(), wraplength=440,
+            font=("Segoe UI", size, "bold" if bold else "normal")
+        )
 
     def button(self, parent, text, command, primary=False):
-        return tk.Button(parent, text=text, command=command, bd=0, padx=20, pady=10,
-                         font=("Segoe UI", 12, "bold"), cursor="hand2",
-                         bg=ACCENT if primary else CARD,
-                         fg="#0d1117" if primary else TEXT,
-                         activebackground=BORDER, activeforeground=TEXT)
+        normal_bg = ACCENT if primary else CARD
+        hover_bg = "#46e060" if primary else CARD_HOVER
+        fg_col = "#090d16" if primary else TEXT
+        btn = tk.Button(
+            parent, text=text, command=command, bd=0, padx=20, pady=11,
+            font=("Segoe UI", 11, "bold"), cursor="hand2",
+            bg=normal_bg, fg=fg_col,
+            activebackground=hover_bg, activeforeground=fg_col,
+            highlightbackground=ACCENT if primary else BORDER,
+            highlightthickness=1
+        )
+        btn.bind("<Enter>", lambda e: btn.config(bg=hover_bg))
+        btn.bind("<Leave>", lambda e: btn.config(bg=normal_bg))
+        return btn
 
     def entry(self, parent, show=""):
-        return tk.Entry(parent, font=("Segoe UI", 12), bg=CARD, fg=TEXT,
-                        insertbackground=TEXT, relief="flat", justify=self.justify(), show=show)
+        e = tk.Entry(
+            parent, font=("Segoe UI", 12), bg=BG, fg=TEXT,
+            insertbackground=ACCENT, relief="flat", justify=self.justify(), show=show,
+            highlightbackground=BORDER, highlightcolor=ACCENT, highlightthickness=1
+        )
+        return e
 
     def set_lang(self, lang):
         self.lang = lang
@@ -128,12 +151,17 @@ class LoginApp(tk.Tk):
             widget.destroy()
 
         top = tk.Frame(self, bg=BG)
-        top.pack(fill="x", padx=20, pady=12)
+        top.pack(fill="x", padx=28, pady=(18, 8))
+        tk.Label(top, text="🚀  " + self.t("brand"), font=("Segoe UI", 10, "bold"),
+                 bg=BG, fg=MUTED).pack(side="left")
         other = "ar" if self.lang == "en" else "en"
         self.button(top, tr(self.lang, "toggle"), lambda: self.set_lang(other)).pack(side="right")
 
-        page = tk.Frame(self, bg=BG)
-        page.pack(fill="both", expand=True, padx=40, pady=10)
+        card = tk.Frame(self, bg=CARD, highlightbackground=BORDER, highlightthickness=1)
+        card.pack(fill="both", expand=True, padx=36, pady=(8, 32))
+
+        page = tk.Frame(card, bg=CARD)
+        page.pack(fill="both", expand=True, padx=36, pady=24)
         builder(page)
 
     def _stop(self):
@@ -161,25 +189,26 @@ class LoginApp(tk.Tk):
     def _show(self, frame):
         photo = _to_photo(frame)
         self.preview.config(image=photo)
-        self.preview.image = photo  # keep a reference or Tk drops the image
+        self.preview.image = photo
 
     # ----- welcome
     def page_welcome(self, page):
-        self.label(page, self.t("app"), 28, True).pack(pady=(40, 4))
-        self.label(page, self.t("welcome"), 13, color=MUTED).pack(pady=(0, 40))
+        tk.Label(page, text="🛰️", font=("Segoe UI", 42), bg=CARD, fg=ACCENT).pack(pady=(30, 8))
+        self.label(page, self.t("app"), 28, True).pack(pady=(0, 6))
+        self.label(page, self.t("welcome"), 12, color=MUTED).pack(pady=(0, 44))
         self.button(page, self.t("log_in"), lambda: self.render(self.page_login),
                     primary=True).pack(fill="x", pady=6)
         self.button(page, self.t("sign_up"), lambda: self.render(self.page_signup)).pack(fill="x", pady=6)
 
     # ----- log in with face
     def page_login(self, page):
-        self.label(page, self.t("look_camera"), 14, True).pack(pady=(10, 12))
-        self.preview = tk.Label(page, bg=CARD)
+        self.label(page, self.t("look_camera"), 15, True).pack(pady=(4, 12))
+        self.preview = tk.Label(page, bg=BG, highlightbackground=BORDER, highlightthickness=1)
         self.preview.pack()
-        self.status = self.label(page, self.t("scanning"), 12, color=MUTED)
+        self.status = self.label(page, self.t("scanning"), 11, color=ACCENT)
         self.status.pack(pady=12)
         self.button(page, self.t("use_password"),
-                    lambda: self.render(self.page_password)).pack(fill="x", pady=(10, 6))
+                    lambda: self.render(self.page_password)).pack(fill="x", pady=(8, 6))
         self.button(page, self.t("back"), lambda: self.render(self.page_welcome)).pack(fill="x")
 
         self.camera = Camera()
@@ -211,33 +240,32 @@ class LoginApp(tk.Tk):
         self.loop_id = self.after(60, self._login_tick)
 
     def _recognised(self, username, frame, location):
-        """Freeze the frame with a box around the face, then wait for the user to continue."""
         top, right, bottom, left = location
         frozen = frame.copy()
-        cv2.rectangle(frozen, (left, top), (right, bottom), (57, 211, 83), 3)  # green box
+        cv2.rectangle(frozen, (left, top), (right, bottom), (57, 211, 83), 3)
         self.render(lambda page: self.page_recognised(page, username, frozen))
 
     def page_recognised(self, page, username, frame):
         user = store.get_user(username)
         self.label(page, self.t("matched", name=user["first_name"]), 20, True,
                    color=ACCENT).pack(pady=(10, 12))
-        self.preview = tk.Label(page, bg=CARD)
+        self.preview = tk.Label(page, bg=BG, highlightbackground=ACCENT, highlightthickness=2)
         self.preview.pack()
         self._show(frame)
         self.button(page, self.t("continue"), lambda: self._finish(username),
-                    primary=True).pack(fill="x", pady=(16, 0))
+                    primary=True).pack(fill="x", pady=(20, 0))
 
-    # ----- log in with username + password (camera fallback)
+    # ----- log in with username + password
     def page_password(self, page):
-        self.label(page, self.t("log_in"), 22, True).pack(pady=(20, 20))
-        self.label(page, self.t("username")).pack(fill="x")
+        self.label(page, self.t("log_in"), 22, True).pack(pady=(12, 20))
+        self.label(page, self.t("username"), 10, True, color=MUTED).pack(anchor="w")
         user_entry = self.entry(page)
-        user_entry.pack(fill="x", ipady=6, pady=(0, 12))
-        self.label(page, self.t("password")).pack(fill="x")
+        user_entry.pack(fill="x", ipady=8, pady=(4, 14))
+        self.label(page, self.t("password"), 10, True, color=MUTED).pack(anchor="w")
         pw_entry = self.entry(page, show="•")
-        pw_entry.pack(fill="x", ipady=6, pady=(0, 12))
+        pw_entry.pack(fill="x", ipady=8, pady=(4, 12))
         self.status = self.label(page, "", color=ERR)
-        self.status.pack(pady=8)
+        self.status.pack(pady=6)
 
         def submit():
             username = user_entry.get().strip()
@@ -254,17 +282,17 @@ class LoginApp(tk.Tk):
 
     # ----- sign up: details
     def page_signup(self, page):
-        self.label(page, self.t("sign_up"), 22, True).pack(pady=(10, 16))
+        self.label(page, self.t("sign_up"), 22, True).pack(pady=(4, 16))
         fields = {}
         for key in ("first", "last", "username"):
-            self.label(page, self.t(key)).pack(fill="x")
+            self.label(page, self.t(key), 10, True, color=MUTED).pack(anchor="w")
             fields[key] = self.entry(page)
-            fields[key].pack(fill="x", ipady=6, pady=(0, 10))
-        self.label(page, self.t("password")).pack(fill="x")
+            fields[key].pack(fill="x", ipady=7, pady=(3, 10))
+        self.label(page, self.t("password"), 10, True, color=MUTED).pack(anchor="w")
         fields["password"] = self.entry(page, show="•")
-        fields["password"].pack(fill="x", ipady=6, pady=(0, 10))
+        fields["password"].pack(fill="x", ipady=7, pady=(3, 8))
         self.status = self.label(page, "", color=ERR)
-        self.status.pack(pady=8)
+        self.status.pack(pady=6)
 
         def next_step():
             values = {key: entry.get().strip() for key, entry in fields.items()}
@@ -285,13 +313,13 @@ class LoginApp(tk.Tk):
     def page_face_scan(self, page):
         self.samples = []
         self.last_capture = 0.0
-        self.label(page, self.t("scan_title"), 22, True).pack(pady=(10, 6))
-        self.label(page, self.t("scan_hint"), 12, color=MUTED).pack(pady=(0, 10))
-        self.preview = tk.Label(page, bg=CARD)
+        self.label(page, self.t("scan_title"), 20, True).pack(pady=(4, 4))
+        self.label(page, self.t("scan_hint"), 11, color=MUTED).pack(pady=(0, 10))
+        self.preview = tk.Label(page, bg=BG, highlightbackground=BORDER, highlightthickness=1)
         self.preview.pack()
-        self.status = self.label(page, self.t("scan_progress", n=0), 12, color=MUTED)
+        self.status = self.label(page, self.t("scan_progress", n=0), 11, color=MUTED)
         self.status.pack(pady=10)
-        self.button(page, self.t("back"), lambda: self.render(self.page_signup)).pack(fill="x", pady=(14, 0))
+        self.button(page, self.t("back"), lambda: self.render(self.page_signup)).pack(fill="x", pady=(10, 0))
 
         self.camera = Camera()
         if not self.camera.ok:
@@ -311,7 +339,7 @@ class LoginApp(tk.Tk):
                 self.status.config(text=self.t("no_face"), fg=ERR)
             elif len(locations) > 1:
                 self.status.config(text=self.t("many_faces"), fg=ERR)
-            elif now - self.last_capture >= 0.8:  # spaced snapshots, not 5 in one second
+            elif now - self.last_capture >= 0.8:
                 encoding = _encode(frame, locations)
                 if _match_face(encoding):
                     self.status.config(text=self.t("scan_dup"), fg=ERR)
@@ -328,25 +356,29 @@ class LoginApp(tk.Tk):
 
     # ----- sign up: station + language
     def page_station(self, page):
-        self.label(page, self.t("station_title"), 20, True).pack(pady=(20, 12))
+        self.label(page, self.t("station_title"), 18, True).pack(pady=(10, 10))
         station_var = tk.StringVar(value=self.sel_station)
 
         def pick_station():
             self.sel_station = station_var.get()
 
         for code in STATIONS:
-            tk.Radiobutton(page, text=self.t("st_" + code), variable=station_var, value=code,
-                           command=pick_station, indicatoron=0, bd=0, width=30, pady=10,
-                           font=("Segoe UI", 12), bg=CARD, fg=TEXT, selectcolor=ACCENT,
-                           activebackground=BORDER).pack(pady=4)
+            tk.Radiobutton(
+                page, text=self.t("st_" + code), variable=station_var, value=code,
+                command=pick_station, indicatoron=0, bd=0, pady=10,
+                font=("Segoe UI", 11, "bold"), bg=BG, fg=TEXT, selectcolor=ACCENT,
+                activebackground=CARD_HOVER, cursor="hand2"
+            ).pack(fill="x", pady=4)
 
-        self.label(page, self.t("language_title"), 20, True).pack(pady=(28, 12))
+        self.label(page, self.t("language_title"), 18, True).pack(pady=(22, 10))
         lang_var = tk.StringVar(value=self.lang)
         for code in ("en", "ar"):
-            tk.Radiobutton(page, text=self.t("lang_" + code), variable=lang_var, value=code,
-                           command=lambda: self.set_lang(lang_var.get()), indicatoron=0, bd=0,
-                           width=30, pady=10, font=("Segoe UI", 12), bg=CARD, fg=TEXT,
-                           selectcolor=ACCENT, activebackground=BORDER).pack(pady=4)
+            tk.Radiobutton(
+                page, text=self.t("lang_" + code), variable=lang_var, value=code,
+                command=lambda: self.set_lang(lang_var.get()), indicatoron=0, bd=0,
+                pady=10, font=("Segoe UI", 11, "bold"), bg=BG, fg=TEXT,
+                selectcolor=ACCENT, activebackground=CARD_HOVER, cursor="hand2"
+            ).pack(fill="x", pady=4)
 
         def save_account():
             data = self.pending
@@ -357,4 +389,4 @@ class LoginApp(tk.Tk):
             )
             self._finish(data["username"])
 
-        self.button(page, self.t("finish"), save_account, primary=True).pack(fill="x", pady=(30, 6))
+        self.button(page, self.t("finish"), save_account, primary=True).pack(fill="x", pady=(26, 6))
